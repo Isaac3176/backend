@@ -11,6 +11,8 @@ app.use(express.json());
 
 app.post("/api/meal-plan", async (req, res) => {
   const prompt = req.body.prompt;
+console.log("🔑 Loaded OpenAI key starts with:", process.env.OPENAI_API_KEY?.slice(0, 12));
+
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
