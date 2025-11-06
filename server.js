@@ -1,3 +1,4 @@
+// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -21,7 +22,7 @@ mongoose
 
 // 2️⃣ Define Schema + Model
 const mealSchema = new mongoose.Schema({
-  userId: String,
+  userId: { type: String, required: true },
   meals: [
     {
       name: String,
@@ -47,8 +48,6 @@ app.post("/api/meal-plan", async (req, res) => {
   const { prompt, userId } = req.body;
   if (!userId) return res.status(400).json({ error: "userId is required" });
 
-  console.log("🔑 Loaded OpenAI key starts with:", process.env.OPENAI_API_KEY?.slice(0, 12));
-
   try {
     // Call OpenAI
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -66,7 +65,6 @@ app.post("/api/meal-plan", async (req, res) => {
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
-    console.log("AI raw response:", content);
 
     // Try to parse JSON
     let jsonData;
@@ -77,18 +75,11 @@ app.post("/api/meal-plan", async (req, res) => {
       if (match) jsonData = JSON.parse(match[0]);
     }
 
-    if (!jsonData) {
-      return res.status(500).json({ error: "AI did not return valid JSON." });
-    }
+    if (!jsonData) return res.status(500).json({ error: "AI did not return valid JSON." });
 
     // Save meal plan
-    const savedPlan = new MealPlan({
-      userId,
-      meals: jsonData.meals,
-    });
-
+    const savedPlan = new MealPlan({ userId, meals: jsonData.meals });
     await savedPlan.save();
-    console.log("✅ Meal plan saved to database for:", userId);
 
     res.json(savedPlan);
   } catch (error) {
@@ -101,7 +92,6 @@ app.post("/api/meal-plan", async (req, res) => {
 app.get("/api/meal-plan/:userId", async (req, res) => {
   try {
     const plans = await MealPlan.find({ userId: req.params.userId }).sort({ createdAt: -1 });
-    // Always return an array (empty if no plans exist)
     res.json(plans || []);
   } catch (err) {
     console.error(err);
@@ -109,5 +99,6 @@ app.get("/api/meal-plan/:userId", async (req, res) => {
   }
 });
 
+// 5️⃣ Use the PORT Render provides
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
