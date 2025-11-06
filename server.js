@@ -37,13 +37,20 @@ const mealSchema = new mongoose.Schema({
 
 const MealPlan = mongoose.model("MealPlan", mealSchema);
 
-// 3️⃣ Existing OpenAI meal generation route (extended)
+// 🟢 Health check route
+app.get("/api/test", (req, res) => {
+  res.json({ status: "Backend is running ✅" });
+});
+
+// 3️⃣ OpenAI meal generation route
 app.post("/api/meal-plan", async (req, res) => {
   const { prompt, userId } = req.body;
+  if (!userId) return res.status(400).json({ error: "userId is required" });
+
   console.log("🔑 Loaded OpenAI key starts with:", process.env.OPENAI_API_KEY?.slice(0, 12));
 
   try {
-    // 🧠 Call OpenAI
+    // Call OpenAI
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -61,29 +68,27 @@ app.post("/api/meal-plan", async (req, res) => {
     const content = data.choices?.[0]?.message?.content || "";
     console.log("AI raw response:", content);
 
-    // 🧩 Try to parse JSON
+    // Try to parse JSON
     let jsonData;
     try {
       jsonData = JSON.parse(content);
     } catch {
       const match = content.match(/\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}/);
-      if (match) {
-        jsonData = JSON.parse(match[0]);
-      }
+      if (match) jsonData = JSON.parse(match[0]);
     }
 
     if (!jsonData) {
       return res.status(500).json({ error: "AI did not return valid JSON." });
     }
 
-    // 💾 Save meal plan to MongoDB
+    // Save meal plan
     const savedPlan = new MealPlan({
-      userId: userId || "guest",
+      userId,
       meals: jsonData.meals,
     });
 
     await savedPlan.save();
-    console.log("✅ Meal plan saved to database for:", userId || "guest");
+    console.log("✅ Meal plan saved to database for:", userId);
 
     res.json(savedPlan);
   } catch (error) {
@@ -92,12 +97,14 @@ app.post("/api/meal-plan", async (req, res) => {
   }
 });
 
-// 4️⃣ Optional route: fetch past meal plans
+// 4️⃣ Fetch past meal plans for a user
 app.get("/api/meal-plan/:userId", async (req, res) => {
   try {
     const plans = await MealPlan.find({ userId: req.params.userId }).sort({ createdAt: -1 });
-    res.json(plans);
+    // Always return an array (empty if no plans exist)
+    res.json(plans || []);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to fetch meal plans" });
   }
 });
