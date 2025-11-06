@@ -8,10 +8,14 @@ import mongoose from "mongoose";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// 1️⃣ Middleware
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "*", // restrict in production
+}));
 app.use(express.json());
 
-// 1️⃣ Connect to MongoDB
+// 2️⃣ MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -20,7 +24,7 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-// 2️⃣ Define Schema + Model
+// 3️⃣ Mongoose Schema + Model
 const mealSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   meals: [
@@ -38,18 +42,17 @@ const mealSchema = new mongoose.Schema({
 
 const MealPlan = mongoose.model("MealPlan", mealSchema);
 
-// 🟢 Health check route
+// 4️⃣ Health check
 app.get("/api/test", (req, res) => {
   res.json({ status: "Backend is running ✅" });
 });
 
-// 3️⃣ OpenAI meal generation route
+// 5️⃣ Generate meal plan via OpenAI
 app.post("/api/meal-plan", async (req, res) => {
   const { prompt, userId } = req.body;
   if (!userId) return res.status(400).json({ error: "userId is required" });
 
   try {
-    // Call OpenAI
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -66,7 +69,7 @@ app.post("/api/meal-plan", async (req, res) => {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
 
-    // Try to parse JSON
+    // Safely parse JSON from AI response
     let jsonData;
     try {
       jsonData = JSON.parse(content);
@@ -75,30 +78,32 @@ app.post("/api/meal-plan", async (req, res) => {
       if (match) jsonData = JSON.parse(match[0]);
     }
 
-    if (!jsonData) return res.status(500).json({ error: "AI did not return valid JSON." });
+    if (!jsonData || !jsonData.meals) {
+      return res.status(500).json({ error: "AI did not return valid JSON." });
+    }
 
-    // Save meal plan
+    // Save to DB
     const savedPlan = new MealPlan({ userId, meals: jsonData.meals });
     await savedPlan.save();
 
     res.json(savedPlan);
   } catch (error) {
-    console.error("Error from OpenAI:", error);
-    res.status(500).json({ error: "Failed to fetch or save meal plan" });
+    console.error("Error generating meal plan:", error);
+    res.status(500).json({ error: "Failed to generate or save meal plan." });
   }
 });
 
-// 4️⃣ Fetch past meal plans for a user
+// 6️⃣ Fetch past meal plans
 app.get("/api/meal-plan/:userId", async (req, res) => {
   try {
     const plans = await MealPlan.find({ userId: req.params.userId }).sort({ createdAt: -1 });
     res.json(plans || []);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch meal plans" });
+    console.error("Error fetching meal plans:", err);
+    res.status(500).json({ error: "Failed to fetch meal plans." });
   }
 });
 
-// 5️⃣ Use the PORT Render provides
+// 7️⃣ Start server on Render's port
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
