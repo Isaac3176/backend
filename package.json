@@ -1,21 +1,31 @@
 {
-  "name": "backend",
+  "name": "meal-planner-backend",
   "version": "1.0.0",
-  "description": "Backend for meal planner app",
-  "main": "server.js",
+  "description": "Backend API for AI Meal Planner",
   "type": "module",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node --watch server.js"
   },
-  "keywords": [],
+  "keywords": [
+    "meal-planner",
+    "api",
+    "express",
+    "mongodb"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "express": "^5.1.0",
-    "node-fetch": "^3.3.2",
-    "mongoose": "^7.5.0"
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^7.6.3",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
